@@ -264,7 +264,7 @@ namespace Util {
          current_char = lexer_context.source.see_current();
       
          Assert(
-            character_map[current_char] != CharacterType::Numeric,
+            character_map[current_char] == CharacterType::Numeric,
             LexerError + 
             "unexpected behaviour: token guesser misslcassified token type"s + 
             LexerErrorEnd
