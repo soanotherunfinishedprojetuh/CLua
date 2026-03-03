@@ -539,7 +539,7 @@ namespace Util {
                   return TokenKind<StringToken>::value;
                } else if(current_char == '\'')
                {
-                  return TokenKind<CharToken>::value;
+                  return TokenKind<CharToken>::value; 
                } else if (current_char == '.' && character_map[next_char] == CharacterType::Numeric)
                {
                   return TokenKind<NumericToken>::value;
