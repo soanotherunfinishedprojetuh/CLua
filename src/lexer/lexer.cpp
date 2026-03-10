@@ -6,6 +6,43 @@
 namespace Util { 
    using namespace std::string_literals;
 
+   unsigned char get_binary_char_code_value(unsigned char bin_char)
+   {
+      if (bin_char >= '0' && bin_char <= '1')
+      {
+         return bin_char - '0';
+      };
+      Assert(false,
+         LexerError +
+         "bin_char is not in binary code"s +
+         LexerErrorEnd
+      )
+      return 0;
+   };
+
+   unsigned char get_hexadecimal_char_code_value(unsigned char hex_char)
+   {
+      if (hex_char >= '0' && hex_char <= '9')
+      {
+         return hex_char - '0';
+      } else if(hex_char >= 'a' && hex_char <= 'f')
+      {
+         return hex_char - 'a' + (unsigned char)10;
+      } else if(hex_char >= 'A' && hex_char <= 'F')
+      {
+         return hex_char - 'A' + (unsigned char)10;
+      } else {
+         Assert(false,
+            LexerError +
+            std::to_string(hex_char) + //retarded
+            " char code is not a hex code char"s + 
+            LexerErrorEnd
+         )
+         return 0;
+      };
+      return 0;
+   };
+
    static const auto character_map = [](){
       using namespace TypeClassificator;
       std::array<CharacterType,256> character_map;
@@ -50,6 +87,53 @@ namespace Util {
 
       return character_map;
    }();
+
+   uint64_t consume_and_eval_integer(LexerContext& lexer_context)
+   {
+      auto current_char = lexer_context.source.see_current();
+      auto char_type = character_map[current_char]; 
+
+      uint64_t integer_value = 0;
+
+      while (char_type == CharacterType::Numeric)
+      {
+         integer_value *= 10;
+         integer_value += (current_char - (unsigned char)'0');
+
+         lexer_context.source.consume();
+         current_char = lexer_context.source.see_current();
+         char_type = character_map[current_char];
+      };
+
+      return integer_value;
+   };
+
+   long double consume_and_eval_fraction(LexerContext& lexer_context)
+   {
+      auto current_char = lexer_context.source.see_current();
+      auto char_type = character_map[current_char]; 
+
+      unsigned int length = 0;
+      long double integer_value = 0;
+
+      while (char_type == CharacterType::Numeric)
+      {
+         integer_value *= 10;
+         integer_value += (current_char - (unsigned char)'0');
+         length++;
+      
+         lexer_context.source.consume();
+         current_char = lexer_context.source.see_current();
+         char_type = character_map[current_char];
+      };
+
+      if (length == 0)
+      {
+         return 0;
+      };
+
+      return integer_value / length;
+   };
 
    inline void test_char_type(unsigned char index_char, CharacterType expected_type)
    {
@@ -130,12 +214,17 @@ namespace Util {
       };
 
       size_t length = 0;
+      uint64_t number_integer = 0;
 
       while (TypeClassificator::is_hex_code(current_char))
       {
+         number_integer *= 16;
+         number_integer += get_hexadecimal_char_code_value(current_char);
+
+         length++;
+
          lexer_context.source.consume();
          current_char = lexer_context.source.see_current();
-         length++;
       }
 
       if (!TypeClassificator::is_number_compapitable_char_type(character_map[current_char]))
@@ -148,7 +237,7 @@ namespace Util {
          return lexer_context.record_error(ErrorCode::TruncatedNumberSequence);
       };
 
-      return lexer_context.record_number(NumberBase::Hexdecimal,NumberType::Integer);
+      return lexer_context.record_number(NumberBase::Hexdecimal,NumberType::Integer,number_integer);
    };
 
    void consume_bin_numeric_token(LexerContext& lexer_context)
@@ -172,12 +261,17 @@ namespace Util {
       };
 
       size_t length = 0;
+      uint64_t number_integer = 0;
 
       while (TypeClassificator::is_bin_code(current_char))
       {
+         number_integer *= 2;
+         number_integer += get_binary_char_code_value(current_char);
+
+         length++;
+
          lexer_context.source.consume();
          current_char = lexer_context.source.see_current();
-         length++;
       }
 
       if (!TypeClassificator::is_number_compapitable_char_type(character_map[current_char]))
@@ -190,13 +284,16 @@ namespace Util {
          return lexer_context.record_error(ErrorCode::TruncatedNumberSequence);
       };
 
-      return lexer_context.record_number(NumberBase::Binary, NumberType::Integer);
+      return lexer_context.record_number(NumberBase::Binary, NumberType::Integer,number_integer);
    }; 
 
    void consume_decimal_numeric_token(LexerContext& lexer_context)
    {
       auto current_char = lexer_context.source.see_current();
       auto first_char = current_char;
+
+      uint64_t number_integer = 0;
+      long double number_fraction = 0;
 
       if (current_char == '.')
       {
@@ -210,15 +307,13 @@ namespace Util {
             "unexpected behaviour: token guesser misslcassified token type"s + 
             LexerErrorEnd
          )
+
+         number_fraction = consume_and_eval_fraction(lexer_context);
+         return lexer_context.record_number(NumberBase::Decimal,NumberType::Float,number_integer,number_fraction);
       };
 
-      consume_numbers(lexer_context);
-
-      if(first_char == '.')
-      {
-         //.[numbers]
-         return lexer_context.record_number(NumberBase::Decimal,NumberType::Float);
-      };
+      //implicit [numbers].?[numbers] case
+      number_integer = consume_and_eval_integer(lexer_context);
 
       auto middle_char = lexer_context.source.see_current();
       auto middle_char_type = character_map[middle_char];
@@ -229,11 +324,11 @@ namespace Util {
          //[numbers](consume_index).[numbers]
          //[numbers](consume_index).
          lexer_context.source.consume();
-         consume_numbers(lexer_context);
+         number_fraction = consume_and_eval_fraction(lexer_context);
       } else if (TypeClassificator::is_number_compapitable_char_type(middle_char_type)) [[likely]]
       {
          //[numbers]
-         return lexer_context.record_number(NumberBase::Decimal,NumberType::Integer);
+         return lexer_context.record_number(NumberBase::Decimal,NumberType::Integer,number_integer);
       } 
       else {
          return lexer_context.record_error(ErrorCode::MalformedNumber);
@@ -246,7 +341,7 @@ namespace Util {
       {
          //[numbers].[numbers]
          //[numbers].
-         return lexer_context.record_number(NumberBase::Decimal,NumberType::Float);
+         return lexer_context.record_number(NumberBase::Decimal,NumberType::Float,number_integer,number_fraction);
       } else {
          return lexer_context.record_error(ErrorCode::MalformedNumber);
       }; 

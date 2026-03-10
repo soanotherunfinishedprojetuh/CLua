@@ -348,6 +348,9 @@ namespace Util {
         SymbolClassifier::SymbolKind last_symbol;  
         KeywordClassifier::Keyword last_keyword;
 
+        uint64_t last_number_integer = 0;
+        long double last_number_fraction = 0; //belongs to <0,inf) in any other case it's invalid
+
         TokenType ultimate_token_type = TokenType::Error;
         TokenType original_token_type = ultimate_token_type; //this variable is strictly for recover if user chooses to do so
 
@@ -403,9 +406,19 @@ namespace Util {
             ultimate_token_type = TokenKind<ErrorToken>::value;
         };
 
-        inline void record_number(NumberBase number_base, NumberType number_type)
+        inline void record_number(NumberBase number_base, NumberType number_type, uint64_t number_integer,long double number_fraction = 0)
         {
             on_emit();
+
+            Assert(
+                last_number_fraction >= 0,
+                LexerError +
+                "lexer can't consume unary minus operator"s + 
+                LexerErrorEnd
+            );
+
+            last_number_integer = number_integer;
+            last_number_fraction = number_fraction;
 
             NumberHint number_hint;
             number_hint.number_base = number_base;

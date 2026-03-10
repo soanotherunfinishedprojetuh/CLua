@@ -1,7 +1,9 @@
 let const b: d64 = 1.234567;
 
 //function declaration:
-//fun [[attributes]] [[function_name]](): [[data type]]
+//fun [[function_name]](): [[attributes]] [[data type]] //data type must be the last attribute specifically
+//not really, because data type is semantics so for grammar it might not matter although I am unsure.
+//";" or "{"
 //{
 // [[code_block]]
 //}
@@ -9,7 +11,7 @@ let const b: d64 = 1.234567;
 //exposes function's identity in luau module
 fun export foo(): u64
 {
-    return 1;
+    return 1; //this can be deduced that foo is a const function
 }
 
 fun main(): i64

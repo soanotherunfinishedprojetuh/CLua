@@ -1,0 +1,97 @@
+block ::= code*
+
+/*
+statement holds statement block
+the
+
+expression modifies data and allows to read that data
+
+declaration makes promises about the shape of data and functions
+declaration itself is binded with expression 
+
+stat_block statement block (local expression really but it must be explicitly marked with brackets "()" ), the compiler should either evaluate the local
+expression to either true or false
+*/
+
+code ::= (expr | stat | decl) ';'
+
+stat ::= if_stat | while_stat | do_while_stat | for_stat
+
+decl ::= (var_decl | fun_decl)
+
+/*stat statement*/
+
+    /*if statement*/
+    if_stat ::= 'if' stat_block code_block ('else if' stat_block code_block)* ('else' code_block)?
+
+    /*for loop*/
+    for_stat ::= (for_is_stat | for_each_stat) code_block
+    for_i_stat ::= 'for' '(' expr ';' expr ';' expr ')'
+    for_each_stat ::= 'foreach' '(' (var_def_expl | (scoped_identifier | identifier)) ':' (scoped_identifier | identifier | iterable_expr) ')'
+
+    /*while/do-while loop*/
+    while_stat ::= 'while' stat_block code_block
+    do_while_stat ::= 'do' code_bloc 'while' stat_block
+    
+    stat_block ::= '(' local_expression ')'
+    
+/*decl*/
+    var_decl ::= var_def_expl | var_def_impl
+    
+    var_decl_base ::= ('const' | 'let') identifier
+
+    var_def_expl ::= var_decl_base ':' (attribute)* (data_type) 
+    var_def_impl ::= var_decl_base '=' expr
+
+    fun_decl ::= 'fun' identifier param_decl_block ':' (attribute)* (data_type) code_block
+/*expr*/
+    /*
+        Expressions by order of precedence and explanations of
+        their functionality
+        
+        Primary:
+            binary operators:
+            reinterpret_cast,
+            static_cast,
+            & - address of,
+            ~ - dereference,
+            ! - not, () --local expression (if no identifier left to it's side)/(function/operator) call (under condition that there's identifier), 
+            [] --indexing operator (only when identifier is next on the left side to it),
+            '-' - unary minus,
+            ++identifier - pre-increment
+            identifier++ - post-increment
+            --identifier - pre-decrement
+            identifier-- - post-decrement
+        Secondary: 
+            ** - raise to the power
+        Tertiary:
+            * - multiply, / - divide
+        Quaterniary; 
+            + - binary addition, '-' - binary subtraction
+        Pentaniary: 
+            >> - bin shift right
+            << - bin shift left
+        Hexateniary:
+            < - less than, > - greater than,
+            <= - less or equal, >= - greater or equal than
+        Septanteniary:
+            == - equal,
+            != - not equal
+
+        Assignement operators:
+            = - assign operator
+        Compound operators:
+            +=, 
+            -=,
+            *=,
+            /=,
+            
+            >>=, 
+            <<=
+    */
+
+/*common*/
+    code_block ::= none_yet
+
+
+    
