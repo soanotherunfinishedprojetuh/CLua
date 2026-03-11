@@ -54,7 +54,7 @@ decl ::= (var_decl | fun_decl)
             reinterpret_cast,
             static_cast,
             & - address of,
-            ~ - dereference,
+            ~ - dereference, pointer
             ! - not, () --local expression (if no identifier left to it's side)/(function/operator) call (under condition that there's identifier), 
             [] --indexing operator (only when identifier is next on the left side to it),
             '-' - unary minus,
