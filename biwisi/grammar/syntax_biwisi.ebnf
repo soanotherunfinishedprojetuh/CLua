@@ -54,8 +54,8 @@ decl ::= (var_decl | fun_decl)
             reinterpret_cast,
             static_cast,
             & - address of,
-            ~ - dereference,
-            ! - not, () --local expression (if no identifier left to it's side)/(function/operator) call (under condition that there's identifier), 
+            ~ - dereference, pointer
+            ! - bitwise/not, () --local expression (if no identifier left to it's side)/(function/operator) call (under condition that there's identifier), 
             [] --indexing operator (only when identifier is next on the left side to it),
             '-' - unary minus,
             ++identifier - pre-increment
@@ -89,9 +89,42 @@ decl ::= (var_decl | fun_decl)
             >>=, 
             <<=
     */
+    /* Entry point for expressions is the lowest precedence */
+expr ::= assignment_expr
 
+/* Assignment (Right-associative) */
+assignment_expr ::= equality_expr (( '=' | '+=' | '-=' | '*=' | '/=' | '>>=' | '<<=' ) assignment_expr)?
+
+/* Septenary: Equality (Left-associative) */
+equality_expr ::= relational_expr (( '==' | '!=' ) relational_expr)*
+
+/* Hexatenary: Relational (Left-associative) */
+relational_expr ::= shift_expr (( '<' | '>' | '<=' | '>=' ) shift_expr)*
+
+/* Pentenary: Bit Shift (Left-associative) */
+shift_expr ::= additive_expr (( '>>' | '<<' ) additive_expr)*
+
+/* Quaternary: Additive (Left-associative) */
+additive_expr ::= multiplicative_expr (( '+' | '-' ) multiplicative_expr)*
+
+/* Tertiary: Multiplicative (Left-associative) */
+multiplicative_expr ::= power_expr (( '*' | '/' ) power_expr)*
+
+/* Secondary: Power (Right-associative usually) */
+power_expr ::= prefix_expr ('**' power_expr)?
+
+/* Primary / Unary Prefix */
+prefix_expr ::= ('&' | '~' | '!' | '-' | '++' | '--' | 'reinterpret_cast<' data_type '>' | 'static_cast<' data_type '>') prefix_expr 
+              | postfix_expr
+
+/* Primary / Postfix & Terminals */
+postfix_expr ::= primary_term ( '++' | '--' | '[' expr ']' | '(' argument_list? ')' )*
+
+/* Base Values */
+primary_term ::= identifier | literal_value | '(' expr ')'
 /*common*/
     code_block ::= none_yet
+
 
 
     
