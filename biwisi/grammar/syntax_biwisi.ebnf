@@ -56,6 +56,7 @@ decl ::= (var_decl | fun_decl)
             & - address of,
             ~ - dereference, pointer
             ! - not, () --local expression (if no identifier left to it's side)/(function/operator) call (under condition that there's identifier), 
+            ! - bitwise not
             [] --indexing operator (only when identifier is next on the left side to it),
             '-' - unary minus,
             ++identifier - pre-increment
