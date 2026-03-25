@@ -665,10 +665,6 @@ namespace Util {
             consume_numeric_token(lexer_context);
             break;
          case TokenType::Symbol:
-            if (lexer_context.source.see_current() == '@')
-            {
-               lexer_context.switch_consumer_mode(ConsumerMode::LuaUCapture);
-            };
             consume_symbol_token(lexer_context);
             break;
          case TokenType::Whitespace:
@@ -1204,6 +1200,10 @@ namespace Util {
          lexer_context.original_token_type = token_type;
          lexer_context.ultimate_token_type = token_type;
          CLua::get_next_token(lexer_context,token_type);
+         if (token_type == TokenType::Identifier && lexer_context.last_keyword == KeywordClassifier::Keyword::Lua)
+         {
+            lexer_context.switch_consumer_mode(ConsumerMode::LuaUCapture);
+         };
          break;
       case ConsumerMode::LuaUCapture:
          token_type = LuaUCapture::guess_token_type(lexer_context);
