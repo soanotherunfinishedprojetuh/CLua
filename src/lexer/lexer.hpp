@@ -3,6 +3,7 @@
 #include <DebuggerAssets/debugger/debugger.hpp>
 #include <metadata/symbol_classifier.hpp>
 #include <metadata/keyword_classifier.hpp>
+#include <metadata/metakeyword_classifier.hpp>
 
 #include <stdint.h>
 #include <vector>
@@ -318,6 +319,7 @@ namespace Util {
 
     enum class ConsumerMode  {
         CLua,
+        MetaCLua,
         LuaU,
         LuaUCapture,
     };

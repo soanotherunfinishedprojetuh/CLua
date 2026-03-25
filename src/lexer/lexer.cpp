@@ -1200,7 +1200,22 @@ namespace Util {
          lexer_context.original_token_type = token_type;
          lexer_context.ultimate_token_type = token_type;
          CLua::get_next_token(lexer_context,token_type);
-         if (token_type == TokenType::Identifier && lexer_context.last_keyword == KeywordClassifier::Keyword::Lua)
+         if (lexer_context.ultimate_token_type == TokenType::Symbol && lexer_context.last_keyword == SymbolKind::AtSign)
+         {
+            lexer_context.switch_consumer_mode(ConsumerMode::MetaCLua);
+         };
+         break;
+      case ConsumerMode::MetaCLua:
+         token_type = MetaCLua::guess_token_type(lexer_context);
+         lexer_context.original_token_type = token_type;
+         lexer_context.ultimate_token_type = token_type;
+         MetaCLua::get_next_token(lexer_context,token_type);
+         /*
+            Later there should be added a separate consumer mode for metalanguage features (@lua_embed, @import, @export stmt... @let a = ...);
+
+            Meta language requires a different list of keywords from the language...
+         */
+         if (lexer_context.ultimate_token_type == TokenType::Identifier && lexer_context.last_keyword == MetaKeyword::LuaEmbed)
          {
             lexer_context.switch_consumer_mode(ConsumerMode::LuaUCapture);
          };

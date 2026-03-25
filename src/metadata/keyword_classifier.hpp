@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstring>
+#include <string>
 
 #define KEYWORDS \
     Keyword(If, "if") \
