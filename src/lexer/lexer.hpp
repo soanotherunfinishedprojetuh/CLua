@@ -456,7 +456,11 @@ namespace Util {
 
                 last_keyword = keyword_type;
             } else {
+<<<<<<< HEAD
                 auto metakeyword_type = KeywordClassifier::get_metakeyword_type(identifier);
+=======
+                auto metakeyword_type = MetaKeyword::get_metakeyword_type(identifier);
+>>>>>>> e03f928 (MetaCLua)
 
                 last_metakeyword = metakeyword_type;
             }
