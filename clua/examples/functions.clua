@@ -14,7 +14,7 @@ fun export foo(): u64
     return 1; //this can be deduced that foo is a const function
 }
 
-fun main(): i64
+fun main() : i64
 {   
 
     let b = 0; //inferred i64

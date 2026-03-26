@@ -665,10 +665,6 @@ namespace Util {
             consume_numeric_token(lexer_context);
             break;
          case TokenType::Symbol:
-            if (lexer_context.source.see_current() == '@')
-            {
-               lexer_context.switch_consumer_mode(ConsumerMode::LuaUCapture);
-            };
             consume_symbol_token(lexer_context);
             break;
          case TokenType::Whitespace:
@@ -744,7 +740,6 @@ namespace Util {
    };
 
    namespace LuaUCode {
-
       bool is_valid_lua_block(LexerContext& lexer_context,size_t peek_offset)
       {
          auto current_char = lexer_context.source.peek(peek_offset);
@@ -1204,6 +1199,11 @@ namespace Util {
          lexer_context.original_token_type = token_type;
          lexer_context.ultimate_token_type = token_type;
          CLua::get_next_token(lexer_context,token_type);
+         if (lexer_context.ultimate_token_type == TokenType::Symbol && lexer_context.last_symbol == SymbolClassifier::SymbolKind::AtSign)
+         {
+            //it should be now meta mode consumer
+            lexer_context.switch_consumer_mode(ConsumerMode::LuaUCapture);
+         };
          break;
       case ConsumerMode::LuaUCapture:
          token_type = LuaUCapture::guess_token_type(lexer_context);

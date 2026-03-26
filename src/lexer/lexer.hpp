@@ -3,6 +3,7 @@
 #include <DebuggerAssets/debugger/debugger.hpp>
 #include <metadata/symbol_classifier.hpp>
 #include <metadata/keyword_classifier.hpp>
+#include <metadata/meta_keyword_classifier.hpp>
 
 #include <stdint.h>
 #include <vector>
@@ -13,8 +14,8 @@ namespace Util {
 
     using namespace std::string_literals;
 
-    constexpr auto LexerError = "Lexer Error: "s;
-    constexpr auto LexerErrorEnd = "\n"s;
+    auto LexerError = "Lexer Error: "s;
+    auto LexerErrorEnd = "\n"s;
 
     enum class ErrorCode: uint8_t {
         None,

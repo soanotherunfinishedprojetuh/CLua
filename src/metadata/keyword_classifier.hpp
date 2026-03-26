@@ -1,5 +1,6 @@
 #pragma once
 
+#include <string>
 #include <cstring>
 
 #define KEYWORDS \
@@ -40,11 +41,9 @@
     Keyword(Typedef, "typedef") \
     Keyword(Auto, "auto") \
     Keyword(Decltype, "decltype") \
-    Keyword(Constexpr, "constexpr") \
-    Keyword(Consteval, "consteval") \
+    Keyword(Comptime, "comptime") \
     Keyword(StaticAssert, "static_assert") \
     Keyword(Sizeof, "sizeof")   \
-    Keyword(Lua,"Lua")
 
 namespace KeywordClassifier {
     enum class Keyword {
