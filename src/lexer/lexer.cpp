@@ -1234,7 +1234,14 @@ namespace Util {
             lexer_context.switch_consumer_mode(ConsumerMode::CLua);
          }
          break;
+      case MetaConsumerMode::None:
+         Assert(false,
+            LexerError + 
+            "Unexpected behaviour of the code, this case should not be happening"s +
+            LexerErrorEnd   
+         );
       }
+      
    };
 
    TokenGeneric Lexer::get_next_token()
