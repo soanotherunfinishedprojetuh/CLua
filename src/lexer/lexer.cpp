@@ -1136,7 +1136,6 @@ namespace Util {
                break;
             }
          } while (brace_balance != 0);
-
          return;
       };
 
@@ -1194,25 +1193,17 @@ namespace Util {
       };
    };
 
-   TokenGeneric Lexer::get_next_token()
+   TokenGenerir get_next_token_in_meta_clua()
    {
-      auto token_type = TokenType::None;
-      
-      size_t start = lexer_context.source.index;
-      
-      switch (lexer_context.see_current_consumer_mode())
+      switch (lexer_context.see_current_meta_consumer_mode())
       {
-      case ConsumerMode::CLua:
-         token_type = CLua::guess_token_type(lexer_context);
-         lexer_context.original_token_type = token_type;
-         lexer_context.ultimate_token_type = token_type;
-         CLua::get_next_token(lexer_context,token_type);
-         if (lexer_context.ultimate_token_type == TokenType::Symbol && lexer_context.last_keyword == SymbolKind::AtSign)
-         {
-            lexer_context.switch_consumer_mode(ConsumerMode::MetaCLua);
-         };
-         break;
-      case ConsumerMode::MetaCLua:
+         case ConsumerMode::MetaCLua:
+         /*
+            There should be 2 consumer modes for CLua and MetaCLua
+
+            MetaCLua consumer type splits into:
+            Meta and MetaLuaEmbedCapture, then MetaLuaEmbedCode
+         */
          token_type = MetaCLua::guess_token_type(lexer_context);
          lexer_context.original_token_type = token_type;
          lexer_context.ultimate_token_type = token_type;
@@ -1238,6 +1229,30 @@ namespace Util {
          break;
       case ConsumerMode::LuaU:
          token_type = LuaUCode::process_next_token(lexer_context);
+         break;
+      }
+   };
+
+   TokenGeneric Lexer::get_next_token()
+   {
+      auto token_type = TokenType::None;
+      
+      size_t start = lexer_context.source.index;
+      
+      switch (lexer_context.see_current_consumer_mode())
+      {
+      case ConsumerMode::CLua:
+         token_type = CLua::guess_token_type(lexer_context);
+         lexer_context.original_token_type = token_type;
+         lexer_context.ultimate_token_type = token_type;
+         CLua::get_next_token(lexer_context,token_type);
+         if (lexer_context.ultimate_token_type == TokenType::Symbol && lexer_context.last_keyword == SymbolKind::AtSign)
+         {
+            lexer_context.switch_consumer_mode(ConsumerMode::MetaCLua);
+         };
+         break;
+      case ConsumerMode::MetaCLua:
+         get_next_token_in_meta_clua();
          break;
       default:
          Assert(false,
