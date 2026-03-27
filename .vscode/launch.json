@@ -4,12 +4,12 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
-         {
-            "name": "Debug Tester",
+        {
+            "name": "Debug Lexer Tester",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/test/test.exe",
-            "args": ["${workspaceFolder}/tests/bundler.cpp"],
+            "program": "${workspaceFolder}/tests/lexer/test.exe",
+            "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [],
@@ -22,15 +22,16 @@
                     "ignoreFailures": true
                 }
             ],
-            "preLaunchTask": "prepare-test",
+            "preLaunchTask": "build-lexer-test",
             "miDebuggerPath": "gdb"
         },
+
         {
             "name": "Debug Lexer",
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/lexer_debug.exe",
-            "args": ["${workspaceFolder}/src/bundler.cpp"],
+            "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [],
@@ -43,8 +44,29 @@
                     "ignoreFailures": true
                 }
             ],
-            "preLaunchTask": "build",
+            "preLaunchTask": "build-lexer",
             "miDebuggerPath": "gdb"
-        }
+        },
+        {
+            "name": "Debug Parser",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/parser_debug.exe",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ],
+            "preLaunchTask": "build-parser",
+            "miDebuggerPath": "gdb"
+        },
     ]
 }

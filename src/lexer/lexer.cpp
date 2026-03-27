@@ -6,73 +6,41 @@
 namespace Util { 
    using namespace std::string_literals;
 
-   enum class CharacterType : uint8_t {
-      Letter,
-      Unicode,
-      Numeric,
-      Symbol, 
-      Whitespace,
-      NewLine,
-      EndOfFile,
-      Error,
+   unsigned char get_binary_char_code_value(unsigned char bin_char)
+   {
+      if (bin_char >= '0' && bin_char <= '1')
+      {
+         return bin_char - '0';
+      };
+      Assert(false,
+         LexerError +
+         "bin_char is not in binary code"s +
+         LexerErrorEnd
+      )
+      return 0;
    };
 
-   namespace TypeClassificator {
-      inline bool is_neutral_char_type(CharacterType char_type)
+   unsigned char get_hexadecimal_char_code_value(unsigned char hex_char)
+   {
+      if (hex_char >= '0' && hex_char <= '9')
       {
-         switch (char_type)
-         {
-         case CharacterType::Whitespace: case CharacterType::NewLine: case CharacterType::EndOfFile:
-            return true;
-         default:
-            return false;
-         }
+         return hex_char - '0';
+      } else if(hex_char >= 'a' && hex_char <= 'f')
+      {
+         return hex_char - 'a' + (unsigned char)10;
+      } else if(hex_char >= 'A' && hex_char <= 'F')
+      {
+         return hex_char - 'A' + (unsigned char)10;
+      } else {
+         Assert(false,
+            LexerError +
+            std::to_string(hex_char) + //retarded
+            " char code is not a hex code char"s + 
+            LexerErrorEnd
+         )
+         return 0;
       };
-
-      inline bool is_numeric_char(char numeric_char)
-      {
-         return numeric_char >= '0' && numeric_char <= '9';
-      };
- 
-      inline bool is_letter_char(char letter_char)
-      {
-         return (letter_char >= 'A' && letter_char <= 'Z') || (letter_char >= 'a' && letter_char <= 'z') || letter_char == '_';
-      };
-
-      inline bool is_special_char(char special_char)
-      {
-         return ((special_char >= '!' && special_char <= '~') && !is_numeric_char(special_char) && !is_letter_char(special_char));
-      };
-
-      inline bool is_newline_char(char new_line_char)
-      {
-         return new_line_char == '\n';
-      };
-
-      inline bool is_whitespace_char(char whitespace_char)
-      {
-         return whitespace_char == ' ' || whitespace_char == '\t' || whitespace_char == '\r';
-      }; //it was perhaps a mistake that \n is treated as a whitespace instead of a special symbol?
-
-      inline bool is_unicode(char unicode_char)
-      {
-         return static_cast<unsigned char>(unicode_char) >= 0b10000000;
-      };
-
-      inline bool is_hex_code(char hex_code_char)
-      {
-        return is_numeric_char(hex_code_char) || (hex_code_char >= 'a' && hex_code_char <= 'f') || (hex_code_char >= 'A' && hex_code_char <= 'F');
-      };
-
-      inline bool is_bin_code(char bin_code_char)
-      {
-         return bin_code_char == '0' || bin_code_char == '1';
-      };
-
-      inline bool is_valid_char(char unknown_char)
-      {
-         return (unknown_char >= ' ' && unknown_char <= '~') || is_whitespace_char(unknown_char) || is_unicode(unknown_char) || unknown_char == '\0' || is_newline_char(unknown_char);
-      };
+      return 0;
    };
 
    static const auto character_map = [](){
@@ -119,6 +87,53 @@ namespace Util {
 
       return character_map;
    }();
+
+   uint64_t consume_and_eval_integer(LexerContext& lexer_context)
+   {
+      auto current_char = lexer_context.source.see_current();
+      auto char_type = character_map[current_char]; 
+
+      uint64_t integer_value = 0;
+
+      while (char_type == CharacterType::Numeric)
+      {
+         integer_value *= 10;
+         integer_value += (current_char - (unsigned char)'0');
+
+         lexer_context.source.consume();
+         current_char = lexer_context.source.see_current();
+         char_type = character_map[current_char];
+      };
+
+      return integer_value;
+   };
+
+   long double consume_and_eval_fraction(LexerContext& lexer_context)
+   {
+      auto current_char = lexer_context.source.see_current();
+      auto char_type = character_map[current_char]; 
+
+      unsigned int length = 0;
+      long double integer_value = 0;
+
+      while (char_type == CharacterType::Numeric)
+      {
+         integer_value *= 10;
+         integer_value += (current_char - (unsigned char)'0');
+         length++;
+      
+         lexer_context.source.consume();
+         current_char = lexer_context.source.see_current();
+         char_type = character_map[current_char];
+      };
+
+      if (length == 0)
+      {
+         return 0;
+      };
+
+      return integer_value / length;
+   };
 
    inline void test_char_type(unsigned char index_char, CharacterType expected_type)
    {
@@ -193,16 +208,26 @@ namespace Util {
 
       current_char = lexer_context.source.see_current();
 
+      if (!TypeClassificator::is_hex_code(current_char))
+      {
+         return lexer_context.record_error(ErrorCode::MalformedNumber);
+      };
+
       size_t length = 0;
+      uint64_t number_integer = 0;
 
       while (TypeClassificator::is_hex_code(current_char))
       {
+         number_integer *= 16;
+         number_integer += get_hexadecimal_char_code_value(current_char);
+
+         length++;
+
          lexer_context.source.consume();
          current_char = lexer_context.source.see_current();
-         length++;
       }
 
-      if (!TypeClassificator::is_neutral_char_type(character_map[current_char]))
+      if (!TypeClassificator::is_number_compapitable_char_type(character_map[current_char]))
       {
          return lexer_context.record_error(ErrorCode::MalformedNumber);
       };
@@ -212,7 +237,7 @@ namespace Util {
          return lexer_context.record_error(ErrorCode::TruncatedNumberSequence);
       };
 
-      return lexer_context.record_number(NumberBase::Hexdecimal,NumberType::Integer);
+      return lexer_context.record_number(NumberBase::Hexdecimal,NumberType::Integer,number_integer);
    };
 
    void consume_bin_numeric_token(LexerContext& lexer_context)
@@ -230,16 +255,26 @@ namespace Util {
 
       current_char = lexer_context.source.see_current();
 
+      if(!TypeClassificator::is_bin_code(current_char))
+      {
+         return lexer_context.record_error(ErrorCode::MalformedNumber);
+      };
+
       size_t length = 0;
+      uint64_t number_integer = 0;
 
       while (TypeClassificator::is_bin_code(current_char))
       {
+         number_integer *= 2;
+         number_integer += get_binary_char_code_value(current_char);
+
+         length++;
+
          lexer_context.source.consume();
          current_char = lexer_context.source.see_current();
-         length++;
       }
 
-      if (!TypeClassificator::is_neutral_char_type(character_map[current_char]))
+      if (!TypeClassificator::is_number_compapitable_char_type(character_map[current_char]))
       {
          return lexer_context.record_error(ErrorCode::MalformedNumber);
       };
@@ -249,7 +284,7 @@ namespace Util {
          return lexer_context.record_error(ErrorCode::TruncatedNumberSequence);
       };
 
-      return lexer_context.record_number(NumberBase::Binary, NumberType::Integer);
+      return lexer_context.record_number(NumberBase::Binary, NumberType::Integer,number_integer);
    }; 
 
    void consume_decimal_numeric_token(LexerContext& lexer_context)
@@ -257,36 +292,43 @@ namespace Util {
       auto current_char = lexer_context.source.see_current();
       auto first_char = current_char;
 
+      uint64_t number_integer = 0;
+      long double number_fraction = 0;
+
       if (current_char == '.')
       {
+         //consume if .[numbers] case 
          lexer_context.source.consume();
          current_char = lexer_context.source.see_current();
+      
+         Assert(
+            character_map[current_char] == CharacterType::Numeric,
+            LexerError + 
+            "unexpected behaviour: token guesser misslcassified token type"s + 
+            LexerErrorEnd
+         )
+
+         number_fraction = consume_and_eval_fraction(lexer_context);
+         return lexer_context.record_number(NumberBase::Decimal,NumberType::Float,number_integer,number_fraction);
       };
 
-      if (current_char == '.')
-      {
-         return lexer_context.record_error(ErrorCode::MalformedNumber);
-      };
-
-      consume_numbers(lexer_context);
-
-      if(first_char == '.')
-      {
-         return lexer_context.record_number(NumberBase::Decimal,NumberType::Float);
-      };
+      //implicit [numbers].?[numbers] case
+      number_integer = consume_and_eval_integer(lexer_context);
 
       auto middle_char = lexer_context.source.see_current();
       auto middle_char_type = character_map[middle_char];
-      auto is_symbol = middle_char_type == CharacterType::Symbol;
 
       if (middle_char == '.')
       {
-         //most probably a float
+         //both cases:
+         //[numbers](consume_index).[numbers]
+         //[numbers](consume_index).
          lexer_context.source.consume();
-         consume_numbers(lexer_context);
-      } else if (TypeClassificator::is_neutral_char_type(middle_char_type) || is_symbol) [[likely]]
+         number_fraction = consume_and_eval_fraction(lexer_context);
+      } else if (TypeClassificator::is_number_compapitable_char_type(middle_char_type)) [[likely]]
       {
-         return lexer_context.record_number(NumberBase::Decimal,NumberType::Integer);
+         //[numbers]
+         return lexer_context.record_number(NumberBase::Decimal,NumberType::Integer,number_integer);
       } 
       else {
          return lexer_context.record_error(ErrorCode::MalformedNumber);
@@ -294,16 +336,12 @@ namespace Util {
 
       auto end_char = lexer_context.source.see_current();
       auto end_char_type = character_map[end_char];
-      auto is_end_char_symbol = end_char_type == CharacterType::Symbol;
 
-      //float path
-      if (end_char == '.')
+      if (TypeClassificator::is_number_compapitable_char_type(end_char_type)) [[likely]] 
       {
-         return lexer_context.record_error(ErrorCode::MalformedNumber);
-      }
-      else if (TypeClassificator::is_neutral_char_type(end_char_type) || is_end_char_symbol) [[likely]] 
-      {
-         return lexer_context.record_number(NumberBase::Decimal,NumberType::Float);
+         //[numbers].[numbers]
+         //[numbers].
+         return lexer_context.record_number(NumberBase::Decimal,NumberType::Float,number_integer,number_fraction);
       } else {
          return lexer_context.record_error(ErrorCode::MalformedNumber);
       }; 
@@ -354,14 +392,14 @@ namespace Util {
       auto start = lexer_context.source.index;
       auto start_ptr = reinterpret_cast<char*>(lexer_context.source.get_source_buffer() + start);
 
-      auto symbol_kind = SymbolKind::UNKNOWN;
+      auto symbol_kind = SymbolKind::Unknown;
       
       while (char_type == CharacterType::Symbol)
       {
          auto length = lexer_context.source.index - start + 1; 
-         auto next_symbol = get_symbol_from_buffer_fragment(start_ptr,length);
+         auto next_symbol = get_symbol_from_buffer(start_ptr,length);
       
-         if (next_symbol == SymbolKind::UNKNOWN)
+         if (next_symbol == SymbolKind::Unknown)
          {
             return lexer_context.record_symbol(symbol_kind);
          }
@@ -372,7 +410,7 @@ namespace Util {
          char_type = character_map[current_char];
       }
 
-      if (symbol_kind == SymbolKind::UNKNOWN)
+      if (symbol_kind == SymbolKind::Unknown)
       {
          return lexer_context.record_error(ErrorCode::UnknownSymbol);
       }
@@ -507,8 +545,12 @@ namespace Util {
             return lexer_context.record_error(ErrorCode::UnclosedString);
          } else if (current_char == '\\') 
          {
-            lexer_context.source.consume(); // skip '\'
-            lexer_context.source.consume(); 
+            lexer_context.source.consume(); // skip '\' unless nullptr
+            auto next_char = lexer_context.source.see_current();
+            if (character_map[next_char] == CharacterType::EndOfFile)
+            {
+               return lexer_context.record_error(ErrorCode::UnclosedString);
+            };
             continue;
          }
       } while (current_char != '"');
@@ -527,30 +569,42 @@ namespace Util {
 
       lexer_context.source.consume(); 
       auto current_char = lexer_context.source.see_current();
-      
-      if (current_char == '\'') {
-        return lexer_context.record_error(ErrorCode::InvalidCharCode);
+
+      size_t counter = 0;
+      while (current_char != '\'')
+      {
+         if (current_char == '\0')
+         {
+            return lexer_context.record_error(ErrorCode::UnclosedChar);
+         };
+
+         if (current_char == '\\') {
+            lexer_context.source.consume(); 
+
+            char next = lexer_context.source.see_current();
+            if (next == '\0')
+            {
+               return lexer_context.record_error(ErrorCode::UnclosedChar);
+            }
+         }  
+         lexer_context.source.consume(); 
+
+         counter++;
+         current_char = lexer_context.source.see_current();
       }
 
-      if (current_char == '\\') {
-        lexer_context.source.consume(); 
-        auto escaped = lexer_context.source.see_current();
-        
-        if (escaped == 'n' || escaped == 't' || escaped == 'r' || 
-            escaped == '0' || escaped == '\\' || escaped == '\'') {
-            lexer_context.source.consume();
-        } else {
-            return lexer_context.record_error(ErrorCode::InvalidCharCode);
-        }
-      } else {
-        lexer_context.source.consume(); 
-      }
+      lexer_context.source.consume(); 
 
-      if (lexer_context.source.see_current() != '\'') {
-        return lexer_context.record_error(ErrorCode::UnclosedChar);
-      }
+      if (counter == 0)
+      {
+         return lexer_context.record_error(ErrorCode::InvalidCharCode);
+      } else if (counter == 1){
+         return;
+      } else if(counter > 1)
+      {
+         return lexer_context.record_error(ErrorCode::TooLongChar);
+      };
       
-      lexer_context.source.consume(); //closing '
       return;
    }
    
@@ -580,7 +634,7 @@ namespace Util {
                   return TokenKind<StringToken>::value;
                } else if(current_char == '\'')
                {
-                  return TokenKind<CharToken>::value;
+                  return TokenKind<CharToken>::value; 
                } else if (current_char == '.' && character_map[next_char] == CharacterType::Numeric)
                {
                   return TokenKind<NumericToken>::value;
@@ -611,10 +665,6 @@ namespace Util {
             consume_numeric_token(lexer_context);
             break;
          case TokenType::Symbol:
-            if (lexer_context.source.see_current() == '@')
-            {
-               lexer_context.switch_consumer_mode(ConsumerMode::LuaUCapture);
-            };
             consume_symbol_token(lexer_context);
             break;
          case TokenType::Whitespace:
@@ -655,6 +705,18 @@ namespace Util {
       };
    }
 
+   namespace MetaCLua {
+      using CLua::guess_token_type;
+
+      void get_next_token(LexerContext& lexer_context, TokenType token_type){
+         switch (token_type)
+         {
+         default:
+            CLua::get_next_token(lexer_context,token_type);
+         }
+      }
+   };
+
    namespace LuaUCapture {
       using CLua::guess_token_type;
 
@@ -681,11 +743,6 @@ namespace Util {
          default:
             CLua::get_next_token(lexer_context,token_type);
          }
-
-         if (lexer_context.luau_capture_state.brace_balance == 0 && lexer_context.luau_capture_state.met_first_brace)
-         {
-            lexer_context.switch_consumer_mode(ConsumerMode::LuaU);
-         };
       }
    };
 
@@ -1079,7 +1136,6 @@ namespace Util {
                break;
             }
          } while (brace_balance != 0);
-
          return;
       };
 
@@ -1137,6 +1193,46 @@ namespace Util {
       };
    };
 
+   TokenGenerir get_next_token_in_meta_clua()
+   {
+      switch (lexer_context.see_current_meta_consumer_mode())
+      {
+         case ConsumerMode::MetaCLua:
+         /*
+            There should be 2 consumer modes for CLua and MetaCLua
+
+            MetaCLua consumer type splits into:
+            Meta and MetaLuaEmbedCapture, then MetaLuaEmbedCode
+         */
+         token_type = MetaCLua::guess_token_type(lexer_context);
+         lexer_context.original_token_type = token_type;
+         lexer_context.ultimate_token_type = token_type;
+         MetaCLua::get_next_token(lexer_context,token_type);
+
+         if (lexer_context.ultimate_token_type == TokenType::Identifier && lexer_context.last_keyword == MetaKeyword::LuaEmbed)
+         {
+            lexer_context.switch_consumer_mode(ConsumerMode::LuaUCapture);
+         } else if(lexer_context.ultimate_token_type == TokenType::NewLine)
+         {
+            lexer_context.switch_consumer_mode(ConsumerMode::CLua);
+         };
+         break;
+      case ConsumerMode::LuaUCapture:
+         token_type = LuaUCapture::guess_token_type(lexer_context);
+         lexer_context.original_token_type = token_type;
+         lexer_context.ultimate_token_type = token_type;
+         LuaUCapture::get_next_token(lexer_context,token_type);
+         if (lexer_context.luau_capture_state.brace_balance == 0 && lexer_context.luau_capture_state.met_first_brace)
+         {
+            lexer_context.switch_consumer_mode(ConsumerMode::LuaU);
+         };
+         break;
+      case ConsumerMode::LuaU:
+         token_type = LuaUCode::process_next_token(lexer_context);
+         break;
+      }
+   };
+
    TokenGeneric Lexer::get_next_token()
    {
       auto token_type = TokenType::None;
@@ -1150,15 +1246,13 @@ namespace Util {
          lexer_context.original_token_type = token_type;
          lexer_context.ultimate_token_type = token_type;
          CLua::get_next_token(lexer_context,token_type);
+         if (lexer_context.ultimate_token_type == TokenType::Symbol && lexer_context.last_keyword == SymbolKind::AtSign)
+         {
+            lexer_context.switch_consumer_mode(ConsumerMode::MetaCLua);
+         };
          break;
-      case ConsumerMode::LuaUCapture:
-         token_type = LuaUCapture::guess_token_type(lexer_context);
-         lexer_context.original_token_type = token_type;
-         lexer_context.ultimate_token_type = token_type;
-         LuaUCapture::get_next_token(lexer_context,token_type);
-         break;
-      case ConsumerMode::LuaU:
-         token_type = LuaUCode::process_next_token(lexer_context);
+      case ConsumerMode::MetaCLua:
+         get_next_token_in_meta_clua();
          break;
       default:
          Assert(false,

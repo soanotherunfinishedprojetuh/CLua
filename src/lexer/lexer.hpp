@@ -1,8 +1,9 @@
 #pragma once
 
 #include <DebuggerAssets/debugger/debugger.hpp>
-#include <symbol_classifier.hpp>
-#include <keyword_classifier.hpp>
+#include <metadata/symbol_classifier.hpp>
+#include <metadata/keyword_classifier.hpp>
+#include <metadata/metakeyword_classifier.hpp>
 
 #include <stdint.h>
 #include <vector>
@@ -15,6 +16,18 @@ namespace Util {
 
     constexpr auto LexerError = "Lexer Error: "s;
     constexpr auto LexerErrorEnd = "\n"s;
+
+    enum class ConsumerMode: uint8_t  {
+        CLua,
+        MetaCLua
+    };
+
+    enum class MetaConsumerMode: uint8_t {
+        None,        
+        Meta,
+        LuaCapture,
+        LuaEmbed
+    };
 
     enum class ErrorCode: uint8_t {
         None,
@@ -180,11 +193,21 @@ namespace Util {
             };
             return source_buffer[index+peek_distance];
         };
+    
+        inline void set_index(size_t new_index)
+        {
+            Assert(new_index < source_size,
+                LexerError + 
+                "new_index is stepping outside of source buffer"s +
+                LexerErrorEnd
+            )
+            index = new_index;
+        };
     };
 
     struct TokenBase
     {
-        TokenType token_type = TokenType::Error;
+        TokenType token_type = TokenType::None;
         size_t length = 0;
         size_t offset = 0;
     };
@@ -268,7 +291,6 @@ namespace Util {
     };  
 
     struct TokenGeneric : TokenBase {
-
         template <typename T>
         requires std::derived_from<T, TokenBase>
         T& as() {
@@ -277,9 +299,12 @@ namespace Util {
         
             const TokenType expected = TokenKind<T>::value;
 
+            /*
             static_assert(expected != TokenType::None,
                 "Invalid token template type is being used, they must be derived from TokenBase"s
             );
+            There's a real use case of NoToken being created from TokenGeneric
+            */
 
             Assert(
                 token_type == expected,
@@ -293,30 +318,6 @@ namespace Util {
 
             return reinterpret_cast<T&>(*this);
         }
-
-        template <typename T>
-        requires std::derived_from<T, TokenBase>
-        const T& as() const {
-            static_assert(sizeof(T) == sizeof(TokenGeneric), "Size mismatch"s);
-            
-            const TokenType expected = TokenKind<T>::value;
-
-            static_assert(expected != TokenType::None,
-                "Invalid token template type is being used, they must be derived from TokenBase"s
-            );
-
-            Assert(
-                token_type == expected,
-                LexerError 
-                + "expected this token type: "s 
-                + std::to_string(static_cast<int>(expected)) 
-                + " got: "s 
-                + std::to_string(static_cast<int>(token_type)) 
-                + LexerErrorEnd
-            );
-
-            return reinterpret_cast<const T&>(*this);
-        }
     };
 
     struct Error {
@@ -326,12 +327,6 @@ namespace Util {
     struct NumberHint {
         NumberType number_type = NumberType::None;
         NumberBase number_base = NumberBase::None;
-    };
-
-    enum class ConsumerMode  {
-        CLua,
-        LuaU,
-        LuaUCapture,
     };
 
     struct LuaUCaptureState {
@@ -347,18 +342,23 @@ namespace Util {
     class LexerContext {
         private:
         bool emitted = false;
-        ConsumerMode consumer_type = ConsumerMode::CLua;
-
+        ConsumerMode consumer_mode = ConsumerMode::CLua;
+        MetaConsumerMode meta_consumer_mode = MetaConsumerMode::None;
         public:
 
         LuaUCaptureState luau_capture_state;
         LuaUCodeState luau_code_state;
 
         Source source;
-        std::vector<Error> errors;
-        std::vector<NumberHint> numbers;
-        std::vector<SymbolClassifier::SymbolKind> symbols;  
-        std::vector<KeywordClassifier::Keyword> keywords;
+
+        Error last_error;
+        NumberHint last_number;
+        SymbolClassifier::SymbolKind last_symbol;  
+        KeywordClassifier::Keyword last_keyword;
+        KeywordClassifier::MetaKeyword last_metakeyword;
+
+        uint64_t last_number_integer = 0;
+        long double last_number_fraction = 0; //belongs to <0,inf) in any other case it's invalid
 
         TokenType ultimate_token_type = TokenType::Error;
         TokenType original_token_type = ultimate_token_type; //this variable is strictly for recover if user chooses to do so
@@ -369,14 +369,28 @@ namespace Util {
 
         inline ConsumerMode see_current_consumer_mode()
         {
-            return consumer_type;
+            return consumer_mode;
         };
 
-        inline void switch_consumer_mode(ConsumerMode new_consumer_type)
+        inline void switch_consumer_mode(ConsumerMode new_consumer_mode)
         {
-            consumer_type = new_consumer_type;
+            if (consumer_mode != ConsumerMode::MetaCLua)
+            {
+                switch_meta_consumer_mode(MetaConsumerMode::None);
+            };
+            consumer_mode = new_consumer_mode;
             luau_capture_state = LuaUCaptureState();
             luau_code_state = LuaUCodeState();
+        };
+
+        inline MetaConsumerMode see_current_meta_consumer_mode()
+        {
+            return meta_consumer_mode;
+        };
+
+        inline void switch_meta_consumer_mode(MetaConsumerMode new_meta_consumer_mode)
+        {
+            meta_consumer_mode = new_meta_consumer_mode;
         };
 
         inline void token_enter()
@@ -409,21 +423,31 @@ namespace Util {
 
             Error error;
             error.error_code = error_code;
-            errors.push_back(error);
+            last_error = error;
 
             original_token_type = ultimate_token_type;
             ultimate_token_type = TokenKind<ErrorToken>::value;
         };
 
-        inline void record_number(NumberBase number_base, NumberType number_type)
+        inline void record_number(NumberBase number_base, NumberType number_type, uint64_t number_integer,long double number_fraction = 0)
         {
             on_emit();
+
+            Assert(
+                last_number_fraction >= 0,
+                LexerError +
+                "lexer can't consume unary minus operator"s + 
+                LexerErrorEnd
+            );
+
+            last_number_integer = number_integer;
+            last_number_fraction = number_fraction;
 
             NumberHint number_hint;
             number_hint.number_base = number_base;
             number_hint.number_type = number_type;
 
-            numbers.push_back(number_hint);
+            last_number = number_hint;
 
             original_token_type = ultimate_token_type;
             ultimate_token_type = TokenKind<NumericToken>::value;
@@ -433,7 +457,7 @@ namespace Util {
         {
             on_emit();
 
-            symbols.push_back(symbol);
+            last_symbol = symbol;
 
             original_token_type = ultimate_token_type;
             ultimate_token_type = TokenKind<SymbolToken>::value;
@@ -443,9 +467,19 @@ namespace Util {
         {
             on_emit();
 
-            auto keyword_type = KeywordClassifier::get_keyword_type(identifier);
+            last_keyword = KeywordClassifier::Keyword::Unknown;
+            last_metakeyword = KeywordClassifier::MetaKeyword::Unknown;
 
-            keywords.push_back(keyword_type);
+            if (consumer_mode != ConsumerMode::MetaCLua)
+            {
+                auto keyword_type = KeywordClassifier::get_keyword_type(identifier);
+
+                last_keyword = keyword_type;
+            } else {
+                auto metakeyword_type = MetaKeyword::get_metakeyword_type(identifier);
+
+                last_metakeyword = metakeyword_type;
+            }
 
             original_token_type = ultimate_token_type;
             ultimate_token_type = TokenKind<IdentifierToken>::value;
@@ -456,6 +490,7 @@ namespace Util {
     {
         private:
         LexerContext lexer_context;
+        TokenGeneric last_peeked_token = TokenGeneric();
 
         public:
         Lexer() = default;
@@ -467,16 +502,142 @@ namespace Util {
         private:
         TokenGeneric get_next_token();
         
+        inline void rollback_cursor()
+        {
+            lexer_context.source.set_index(last_peeked_token.offset);
+        };
+
         public:
+        
+        LexerContext& get_lexer_context()
+        {
+            return lexer_context;
+        };
+
         TokenGeneric process_next_token()
         {
+            if (last_peeked_token.token_type != TokenType::None)
+            {
+                auto last_token_copy = last_peeked_token;
+                last_peeked_token.as<NoToken>();
+
+                return last_token_copy;
+            }
             lexer_context.token_enter();
             return get_next_token();
         };
 
+        TokenGeneric peek_next_token() {
+            Assert(
+                last_peeked_token.token_type == TokenType::None,
+                LexerError + 
+                "can't peek next token again after doing it before"s + 
+                LexerErrorEnd
+            )
+            lexer_context.token_enter();
+            auto token = get_next_token();
+            last_peeked_token = token;            
+            return token;
+        }
+
         const Error get_last_error()
         {
-            return lexer_context.errors.back();
+            return lexer_context.last_error;
+        };
+
+        const NumberHint get_last_number_hint()
+        {
+            return lexer_context.last_number;
+        };
+
+        const SymbolClassifier::SymbolKind get_last_symbol()
+        {
+            return lexer_context.last_symbol;
+        };
+
+        const KeywordClassifier::Keyword get_last_keyword()
+        {
+            return lexer_context.last_keyword;
         };
     };
+
+    enum class CharacterType : uint8_t {
+      Letter,
+      Unicode,
+      Numeric,
+      Symbol, 
+      Whitespace,
+      NewLine,
+      EndOfFile,
+      Error,
+   };
+
+    namespace TypeClassificator {
+      inline bool is_neutral_char_type(CharacterType char_type)
+      {
+         switch (char_type)
+         {
+         case CharacterType::Whitespace: case CharacterType::NewLine: case CharacterType::EndOfFile:
+            return true;
+         default:
+            return false;
+         }
+      };
+
+      inline bool is_number_compapitable_char_type(CharacterType char_type)
+      {
+         switch (char_type)
+         {
+         case CharacterType::Whitespace: case CharacterType::NewLine: case CharacterType::EndOfFile: case CharacterType::Symbol:
+            return true;
+         default:
+            return false;
+         }
+      };
+
+      inline bool is_numeric_char(char numeric_char)
+      {
+         return numeric_char >= '0' && numeric_char <= '9';
+      };
+ 
+      inline bool is_letter_char(char letter_char)
+      {
+         return (letter_char >= 'A' && letter_char <= 'Z') || (letter_char >= 'a' && letter_char <= 'z') || letter_char == '_';
+      };
+
+      inline bool is_special_char(char special_char)
+      {
+         return ((special_char >= '!' && special_char <= '~') && !is_numeric_char(special_char) && !is_letter_char(special_char));
+      };
+
+      inline bool is_newline_char(char new_line_char)
+      {
+         return new_line_char == '\n';
+      };
+
+      inline bool is_whitespace_char(char whitespace_char)
+      {
+         return whitespace_char == ' ' || whitespace_char == '\t' || whitespace_char == '\r';
+      }; //it was perhaps a mistake that \n is treated as a whitespace instead of a special symbol?
+
+      inline bool is_unicode(char unicode_char)
+      {
+         return static_cast<unsigned char>(unicode_char) >= 0b10000000;
+      };
+
+      inline bool is_hex_code(char hex_code_char)
+      {
+        return is_numeric_char(hex_code_char) || (hex_code_char >= 'a' && hex_code_char <= 'f') || (hex_code_char >= 'A' && hex_code_char <= 'F');
+      };
+
+      inline bool is_bin_code(char bin_code_char)
+      {
+         return bin_code_char == '0' || bin_code_char == '1';
+      };
+
+      inline bool is_valid_char(char unknown_char)
+      {
+         return (unknown_char >= ' ' && unknown_char <= '~') || is_whitespace_char(unknown_char) || is_unicode(unknown_char) || unknown_char == '\0' || is_newline_char(unknown_char);
+      };
+   };
 }   
