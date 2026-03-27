@@ -3,7 +3,7 @@
 #include <DebuggerAssets/debugger/debugger.hpp>
 #include <metadata/symbol_classifier.hpp>
 #include <metadata/keyword_classifier.hpp>
-#include <metadata/meta_keyword_classifier.hpp>
+#include <metadata/metakeyword_classifier.hpp>
 
 #include <stdint.h>
 #include <vector>
@@ -14,8 +14,15 @@ namespace Util {
 
     using namespace std::string_literals;
 
-    auto LexerError = "Lexer Error: "s;
-    auto LexerErrorEnd = "\n"s;
+    constexpr auto LexerError = "Lexer Error: "s;
+    constexpr auto LexerErrorEnd = "\n"s;
+
+    enum class ConsumerMode: uint8_t  {
+        CLua,
+        MetaCLua,
+        LuaU,
+        LuaUCapture,
+    };
 
     enum class ErrorCode: uint8_t {
         None,
@@ -317,12 +324,6 @@ namespace Util {
         NumberBase number_base = NumberBase::None;
     };
 
-    enum class ConsumerMode  {
-        CLua,
-        LuaU,
-        LuaUCapture,
-    };
-
     struct LuaUCaptureState {
         size_t brace_balance = 0; //Brace balance is how many "[" braces are against "]"
         bool met_first_brace = false;
@@ -348,6 +349,7 @@ namespace Util {
         NumberHint last_number;
         SymbolClassifier::SymbolKind last_symbol;  
         KeywordClassifier::Keyword last_keyword;
+        KeywordClassifier::MetaKeyword last_metakeyword;
 
         uint64_t last_number_integer = 0;
         long double last_number_fraction = 0; //belongs to <0,inf) in any other case it's invalid
@@ -445,9 +447,19 @@ namespace Util {
         {
             on_emit();
 
-            auto keyword_type = KeywordClassifier::get_keyword_type(identifier);
+            last_keyword = KeywordClassifier::Keyword::Unknown;
+            last_metakeyword = KeywordClassifier::MetaKeyword::Unknown;
 
-            last_keyword = keyword_type;
+            if (consumer_mode != ConsumerMode::MetaCLua)
+            {
+                auto keyword_type = KeywordClassifier::get_keyword_type(identifier);
+
+                last_keyword = keyword_type;
+            } else {
+                auto metakeyword_type = MetaKeyword::get_metakeyword_type(identifier);
+
+                last_metakeyword = metakeyword_type;
+            }
 
             original_token_type = ultimate_token_type;
             ultimate_token_type = TokenKind<IdentifierToken>::value;

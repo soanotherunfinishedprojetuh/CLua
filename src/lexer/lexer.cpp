@@ -705,6 +705,18 @@ namespace Util {
       };
    }
 
+   namespace MetaCLua {
+      using CLua::guess_token_type;
+
+      void get_next_token(LexerContext& lexer_context, TokenType token_type){
+         switch (token_type)
+         {
+         default:
+            CLua::get_next_token(lexer_context,token_type);
+         }
+      }
+   };
+
    namespace LuaUCapture {
       using CLua::guess_token_type;
 
@@ -731,11 +743,6 @@ namespace Util {
          default:
             CLua::get_next_token(lexer_context,token_type);
          }
-
-         if (lexer_context.luau_capture_state.brace_balance == 0 && lexer_context.luau_capture_state.met_first_brace)
-         {
-            lexer_context.switch_consumer_mode(ConsumerMode::LuaU);
-         };
       }
    };
 
@@ -1199,10 +1206,23 @@ namespace Util {
          lexer_context.original_token_type = token_type;
          lexer_context.ultimate_token_type = token_type;
          CLua::get_next_token(lexer_context,token_type);
-         if (lexer_context.ultimate_token_type == TokenType::Symbol && lexer_context.last_symbol == SymbolClassifier::SymbolKind::AtSign)
+         if (lexer_context.ultimate_token_type == TokenType::Symbol && lexer_context.last_keyword == SymbolKind::AtSign)
          {
-            //it should be now meta mode consumer
+            lexer_context.switch_consumer_mode(ConsumerMode::MetaCLua);
+         };
+         break;
+      case ConsumerMode::MetaCLua:
+         token_type = MetaCLua::guess_token_type(lexer_context);
+         lexer_context.original_token_type = token_type;
+         lexer_context.ultimate_token_type = token_type;
+         MetaCLua::get_next_token(lexer_context,token_type);
+
+         if (lexer_context.ultimate_token_type == TokenType::Identifier && lexer_context.last_keyword == MetaKeyword::LuaEmbed)
+         {
             lexer_context.switch_consumer_mode(ConsumerMode::LuaUCapture);
+         } else if(lexer_context.ultimate_token_type == TokenType::NewLine)
+         {
+            lexer_context.switch_consumer_mode(ConsumerMode::CLua);
          };
          break;
       case ConsumerMode::LuaUCapture:
@@ -1210,6 +1230,10 @@ namespace Util {
          lexer_context.original_token_type = token_type;
          lexer_context.ultimate_token_type = token_type;
          LuaUCapture::get_next_token(lexer_context,token_type);
+         if (lexer_context.luau_capture_state.brace_balance == 0 && lexer_context.luau_capture_state.met_first_brace)
+         {
+            lexer_context.switch_consumer_mode(ConsumerMode::LuaU);
+         };
          break;
       case ConsumerMode::LuaU:
          token_type = LuaUCode::process_next_token(lexer_context);
