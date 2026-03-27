@@ -4,6 +4,7 @@
 #include <array>
 
 namespace Util { 
+
    using namespace std::string_literals;
 
    unsigned char get_binary_char_code_value(unsigned char bin_char)
