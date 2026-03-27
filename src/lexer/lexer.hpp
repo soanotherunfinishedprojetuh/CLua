@@ -19,9 +19,14 @@ namespace Util {
 
     enum class ConsumerMode: uint8_t  {
         CLua,
-        MetaCLua,
-        LuaU,
-        LuaUCapture,
+        MetaCLua
+    };
+
+    enum class MetaConsumerMode: uint8_t {
+        None,        
+        Meta,
+        LuaCapture,
+        LuaEmbed
     };
 
     enum class ErrorCode: uint8_t {
@@ -338,6 +343,7 @@ namespace Util {
         private:
         bool emitted = false;
         ConsumerMode consumer_mode = ConsumerMode::CLua;
+        MetaConsumerMode meta_consumer_mode = MetaConsumerMode::None;
         public:
 
         LuaUCaptureState luau_capture_state;
@@ -368,9 +374,23 @@ namespace Util {
 
         inline void switch_consumer_mode(ConsumerMode new_consumer_mode)
         {
+            if (consumer_mode != ConsumerMode::MetaCLua)
+            {
+                switch_meta_consumer_mode(MetaConsumerMode::None);
+            };
             consumer_mode = new_consumer_mode;
             luau_capture_state = LuaUCaptureState();
             luau_code_state = LuaUCodeState();
+        };
+
+        inline MetaConsumerMode see_current_meta_consumer_mode()
+        {
+            return meta_consumer_mode;
+        };
+
+        inline void switch_meta_consumer_mode(MetaConsumerMode new_meta_consumer_mode)
+        {
+            meta_consumer_mode = new_meta_consumer_mode;
         };
 
         inline void token_enter()
