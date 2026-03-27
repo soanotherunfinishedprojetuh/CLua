@@ -1136,7 +1136,6 @@ namespace Util {
                break;
             }
          } while (brace_balance != 0);
-
          return;
       };
 
@@ -1175,7 +1174,6 @@ namespace Util {
          {
          case TokenType::LuaBlock:
             consume_lua_block(lexer_context);
-            lexer_context.switch_consumer_mode(ConsumerMode::CLua);
             break;
          case TokenType::Whitespace:
             CLua::get_next_token(lexer_context,TokenType::Whitespace);
@@ -1194,8 +1192,61 @@ namespace Util {
       };
    };
 
+   TokenGeneric get_next_token_in_meta_clua(LexerContext& lexer_context)
+   {
+      auto token_type = TokenType::None;
+      switch (lexer_context.see_current_meta_consumer_mode())
+      {
+         case MetaConsumerMode::Meta:
+         /*
+            There should be 2 consumer modes for CLua and MetaCLua
+
+            MetaCLua consumer type splits into:
+            Meta and MetaLuaEmbedCapture, then MetaLuaEmbedCode
+         */
+         token_type = MetaCLua::guess_token_type(lexer_context);
+         lexer_context.original_token_type = token_type;
+         lexer_context.ultimate_token_type = token_type;
+         MetaCLua::get_next_token(lexer_context,token_type);
+
+         if (lexer_context.ultimate_token_type == TokenType::Identifier && lexer_context.last_metakeyword == KeywordClassifier::MetaKeyword::LuaEmbed)
+         {
+            lexer_context.switch_meta_consumer_mode(MetaConsumerMode::LuaCapture);
+         } else if(lexer_context.ultimate_token_type == TokenType::NewLine)
+         {
+            lexer_context.switch_consumer_mode(ConsumerMode::CLua);
+         };
+         break;
+      case MetaConsumerMode::LuaCapture:
+         token_type = LuaUCapture::guess_token_type(lexer_context);
+         lexer_context.original_token_type = token_type;
+         lexer_context.ultimate_token_type = token_type;
+         LuaUCapture::get_next_token(lexer_context,token_type);
+         if (lexer_context.luau_capture_state.brace_balance == 0 && lexer_context.luau_capture_state.met_first_brace)
+         {
+            lexer_context.switch_meta_consumer_mode(MetaConsumerMode::LuaEmbed);
+         };
+         break;
+      case MetaConsumerMode::LuaEmbed:
+         token_type = LuaUCode::process_next_token(lexer_context);
+         if (lexer_context.ultimate_token_type == TokenType::LuaBlock)
+         {
+            lexer_context.switch_consumer_mode(ConsumerMode::CLua);
+         }
+         break;
+      case MetaConsumerMode::None:
+         Assert(false,
+            LexerError + 
+            "Unexpected behaviour of the code, this case should not be happening"s +
+            LexerErrorEnd   
+         );
+      }
+      
+   };
+
    TokenGeneric Lexer::get_next_token()
    {
+      using namespace SymbolClassifier;
       auto token_type = TokenType::None;
       
       size_t start = lexer_context.source.index;
@@ -1207,37 +1258,13 @@ namespace Util {
          lexer_context.original_token_type = token_type;
          lexer_context.ultimate_token_type = token_type;
          CLua::get_next_token(lexer_context,token_type);
-         if (lexer_context.ultimate_token_type == TokenType::Symbol && lexer_context.last_keyword == SymbolKind::AtSign)
+         if (lexer_context.ultimate_token_type == TokenType::Symbol && lexer_context.last_symbol == SymbolKind::AtSign)
          {
             lexer_context.switch_consumer_mode(ConsumerMode::MetaCLua);
          };
          break;
       case ConsumerMode::MetaCLua:
-         token_type = MetaCLua::guess_token_type(lexer_context);
-         lexer_context.original_token_type = token_type;
-         lexer_context.ultimate_token_type = token_type;
-         MetaCLua::get_next_token(lexer_context,token_type);
-
-         if (lexer_context.ultimate_token_type == TokenType::Identifier && lexer_context.last_keyword == MetaKeyword::LuaEmbed)
-         {
-            lexer_context.switch_consumer_mode(ConsumerMode::LuaUCapture);
-         } else if(lexer_context.ultimate_token_type == TokenType::NewLine)
-         {
-            lexer_context.switch_consumer_mode(ConsumerMode::CLua);
-         };
-         break;
-      case ConsumerMode::LuaUCapture:
-         token_type = LuaUCapture::guess_token_type(lexer_context);
-         lexer_context.original_token_type = token_type;
-         lexer_context.ultimate_token_type = token_type;
-         LuaUCapture::get_next_token(lexer_context,token_type);
-         if (lexer_context.luau_capture_state.brace_balance == 0 && lexer_context.luau_capture_state.met_first_brace)
-         {
-            lexer_context.switch_consumer_mode(ConsumerMode::LuaU);
-         };
-         break;
-      case ConsumerMode::LuaU:
-         token_type = LuaUCode::process_next_token(lexer_context);
+         get_next_token_in_meta_clua(lexer_context);
          break;
       default:
          Assert(false,

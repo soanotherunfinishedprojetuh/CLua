@@ -1,6 +1,6 @@
 #pragma once
 
-#include <DebuggerAssets/debugger/debugger.hpp>
+#include <debugger/debugger.hpp>
 #include <metadata/symbol_classifier.hpp>
 #include <metadata/keyword_classifier.hpp>
 #include <metadata/metakeyword_classifier.hpp>
@@ -19,9 +19,14 @@ namespace Util {
 
     enum class ConsumerMode: uint8_t  {
         CLua,
-        MetaCLua,
-        LuaU,
-        LuaUCapture,
+        MetaCLua
+    };
+
+    enum class MetaConsumerMode: uint8_t {
+        None,        
+        Meta,
+        LuaCapture,
+        LuaEmbed
     };
 
     enum class ErrorCode: uint8_t {
@@ -338,6 +343,7 @@ namespace Util {
         private:
         bool emitted = false;
         ConsumerMode consumer_mode = ConsumerMode::CLua;
+        MetaConsumerMode meta_consumer_mode = MetaConsumerMode::None;
         public:
 
         LuaUCaptureState luau_capture_state;
@@ -368,9 +374,23 @@ namespace Util {
 
         inline void switch_consumer_mode(ConsumerMode new_consumer_mode)
         {
+            if (consumer_mode != ConsumerMode::MetaCLua)
+            {
+                switch_meta_consumer_mode(MetaConsumerMode::None);
+            };
             consumer_mode = new_consumer_mode;
             luau_capture_state = LuaUCaptureState();
             luau_code_state = LuaUCodeState();
+        };
+
+        inline MetaConsumerMode see_current_meta_consumer_mode()
+        {
+            return meta_consumer_mode;
+        };
+
+        inline void switch_meta_consumer_mode(MetaConsumerMode new_meta_consumer_mode)
+        {
+            meta_consumer_mode = new_meta_consumer_mode;
         };
 
         inline void token_enter()
@@ -457,10 +477,14 @@ namespace Util {
                 last_keyword = keyword_type;
             } else {
 <<<<<<< HEAD
+<<<<<<< HEAD
                 auto metakeyword_type = KeywordClassifier::get_metakeyword_type(identifier);
 =======
                 auto metakeyword_type = MetaKeyword::get_metakeyword_type(identifier);
 >>>>>>> e03f928 (MetaCLua)
+=======
+                auto metakeyword_type = KeywordClassifier::get_metakeyword_type(identifier);
+>>>>>>> 0fe38f9c9d3d0d96c7a907791693b44c349f8476
 
                 last_metakeyword = metakeyword_type;
             }
