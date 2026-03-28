@@ -2,7 +2,6 @@
 
 #include <string>
 #include <cstring>
-#include <string>
 
 #define KEYWORDS \
     Keyword(If, "if") \
@@ -45,6 +44,9 @@
     Keyword(Comptime, "comptime") \
     Keyword(StaticAssert, "static_assert") \
     Keyword(Sizeof, "sizeof")   \
+    Keyword(LuaEmbed,"lua_embed") \
+    Keyword(Import,"import")\
+    Keyword(Export,"export")
 
 namespace KeywordClassifier {
     enum class Keyword {

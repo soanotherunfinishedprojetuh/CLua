@@ -3,7 +3,6 @@
 #include <debugger/debugger.hpp>
 #include <metadata/symbol_classifier.hpp>
 #include <metadata/keyword_classifier.hpp>
-#include <metadata/metakeyword_classifier.hpp>
 
 #include <stdint.h>
 #include <vector>
@@ -353,9 +352,8 @@ namespace Util {
 
         Error last_error;
         NumberHint last_number;
-        SymbolClassifier::SymbolKind last_symbol;  
-        KeywordClassifier::Keyword last_keyword;
-        KeywordClassifier::MetaKeyword last_metakeyword;
+        SymbolClassifier::SymbolKind last_symbol = SymbolClassifier::SymbolKind::Unknown;  
+        KeywordClassifier::Keyword last_keyword = KeywordClassifier::Keyword::Unknown;
 
         uint64_t last_number_integer = 0;
         long double last_number_fraction = 0; //belongs to <0,inf) in any other case it's invalid
@@ -374,9 +372,12 @@ namespace Util {
 
         inline void switch_consumer_mode(ConsumerMode new_consumer_mode)
         {
-            if (consumer_mode != ConsumerMode::MetaCLua)
+            if (new_consumer_mode != ConsumerMode::MetaCLua)
             {
                 switch_meta_consumer_mode(MetaConsumerMode::None);
+            } else
+            {
+                switch_meta_consumer_mode(MetaConsumerMode::Meta);
             };
             consumer_mode = new_consumer_mode;
             luau_capture_state = LuaUCaptureState();
@@ -467,27 +468,8 @@ namespace Util {
         {
             on_emit();
 
-            last_keyword = KeywordClassifier::Keyword::Unknown;
-            last_metakeyword = KeywordClassifier::MetaKeyword::Unknown;
-
-            if (consumer_mode != ConsumerMode::MetaCLua)
-            {
-                auto keyword_type = KeywordClassifier::get_keyword_type(identifier);
-
-                last_keyword = keyword_type;
-            } else {
-<<<<<<< HEAD
-<<<<<<< HEAD
-                auto metakeyword_type = KeywordClassifier::get_metakeyword_type(identifier);
-=======
-                auto metakeyword_type = MetaKeyword::get_metakeyword_type(identifier);
->>>>>>> e03f928 (MetaCLua)
-=======
-                auto metakeyword_type = KeywordClassifier::get_metakeyword_type(identifier);
->>>>>>> 0fe38f9c9d3d0d96c7a907791693b44c349f8476
-
-                last_metakeyword = metakeyword_type;
-            }
+            auto keyword_type = KeywordClassifier::get_keyword_type(identifier);
+            last_keyword = keyword_type;
 
             original_token_type = ultimate_token_type;
             ultimate_token_type = TokenKind<IdentifierToken>::value;
