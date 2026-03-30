@@ -30,6 +30,7 @@ void run_test(const Test<TokenCount>& test)
     for (size_t i = 0; i < TokenCount; ++i)
     {
         auto token = lexer.process_next_token();
+        bool cond = token.token_type == test.expected_types[i] && token.offset == test.expected_offsets[i] && token.length == test.expected_lengths[i];
 
         assert(token.token_type == test.expected_types[i]);
         assert(token.offset == test.expected_offsets[i]);
@@ -174,7 +175,7 @@ int main()
 
     Test<7> LUA_CAPTURE_AND_BLOCK {
         "lua capture and block",
-        "@Lua []{print(\"x\")}",
+        "@lua_embed []{print(\"x\")}",
         {
             Util::TokenType::Symbol,
             Util::TokenType::Identifier,
@@ -184,8 +185,8 @@ int main()
             Util::TokenType::LuaBlock,
             Util::TokenType::EndOfFile
         },
-        { 0, 1, 4, 5, 6, 7, 19 },
-        { 1, 3, 1, 1, 1, 12, 1 }
+        { 0, 1, 10, 11, 12, 13, 25 },
+        { 1, 9, 1, 1, 1, 12, 1 }
     };
 
     Test<2> EMPTY_STRING {
@@ -365,7 +366,7 @@ int main()
 
     Test<7> LUA_EMPTY_BLOCK {
         "lua empty block",
-        "@Lua []{}",
+        "@lua_embed []{}",
         {
             Util::TokenType::Symbol,
             Util::TokenType::Identifier,
@@ -375,13 +376,13 @@ int main()
             Util::TokenType::LuaBlock,
             Util::TokenType::EndOfFile
         },
-        { 0, 1, 4, 5, 6, 7, 9 },
-        { 1, 3, 1, 1, 1, 2, 1 }
+        { 0, 1, 10, 11, 12, 13, 15 },
+        { 1, 9, 1, 1, 1, 2, 1 }
     };
 
     Test<7> LUA_BRACE_INSIDE_STRING {
         "lua brace inside string",
-        "@Lua []{print(\"{\")}",
+        "@lua_embed []{print(\"{\")}",
         {
             Util::TokenType::Symbol,
             Util::TokenType::Identifier,
@@ -391,13 +392,13 @@ int main()
             Util::TokenType::LuaBlock,
             Util::TokenType::EndOfFile
         },
-        { 0, 1, 4, 5, 6, 7, 19 },
-        { 1, 3, 1, 1, 1, 12, 1 }
+        { 0, 1, 10, 11, 12, 13, 25 },
+        { 1, 9, 1, 1, 1, 12, 1 }
     };
 
     Test<7> LUA_UNTERMINATED {
         "lua unterminated",
-        "@Lua []{print(1)",
+        "@lua_embed []{print(1)",
         {
             Util::TokenType::Symbol,
             Util::TokenType::Identifier,
@@ -407,8 +408,8 @@ int main()
             Util::TokenType::Error,
             Util::TokenType::EndOfFile
         },
-        { 0, 1, 4, 5, 6, 7, 16},
-        { 1, 3, 1, 1, 1, 9, 1 },
+        { 0, 1, 10, 11, 12, 13, 22},
+        { 1, 9, 1, 1, 1, 9, 1 },
 
         true,
         Util::ErrorCode::UnclosedLuaBlock
